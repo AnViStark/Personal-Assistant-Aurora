@@ -6,7 +6,6 @@ class OpenRouterClient():
         self.client = OpenAI(
             base_url="https://openrouter.ai/api/v1",
             api_key=openrouter_key,
-
         )
     
     def chat_completion(self, model: str, messages: list):
@@ -18,12 +17,12 @@ class OpenRouterClient():
                     top_p=0.9,
                     frequency_penalty=0.4,
                     presence_penalty=0.6,
-                    extra_body={
-                        "provider": {
-                            "order": ["Chutes"],
-                            "allow_fallbacks": False
-                        }
-                    },
+                    # extra_body={
+                    #     "provider": {
+                    #         "order": ["Chutes"],
+                    #         "allow_fallbacks": False
+                    #     }
+                    # },
                     response_format = {
                         "type": "json_schema",
                         "json_schema": {
@@ -32,47 +31,122 @@ class OpenRouterClient():
                             "schema": {
                                 "type": "object",
                                 "properties": {
-                                    "thoughts": {"type": "string", "description": "A concise explanation of how you interpret Andrey’s request and your plan to respond. Specify if you’ll use a tool or answer directly, and why. Explain your choice of mood. Keep it short, logical, and relevant to the request."},
-                                    "tool": {"type": "string", "enum": ['none', 'open_app'], "description": "The tool to use for user's request. Choose 'none' unless the request explicitly requires a tool. If no suitable tool exists, use 'none' and suggest an alternative in final_answer."},
+                                    "thoughts": {
+                                        "type": "string",
+                                        "description": (
+                                            "Краткое и логичное объяснение, как ты понял запрос Андрея, "
+                                            "и твой план действий. Укажи, нужно ли искать в памяти, "
+                                            "вызывать инструмент или отвечать сразу. Объясни выбор настроения. "
+                                            "Не используй markdown или форматирование."
+                                        )
+                                    },
+                                    "tool": {
+                                        "type": "string",
+                                        "enum": ['none', 'open_app'],
+                                        "description": (
+                                            "Инструмент, который нужно использовать. "
+                                            "Используй 'none', если инструмент не требуется. "
+                                            "Если запрос требует действия (например, открыть приложение), выбери подходящий инструмент. "
+                                            "Если подходящего нет — оставь 'none'. "
+                                        )
+                                    },
                                     "tool_arguments": {
                                         "type": "object", 
                                         "properties": {
                                             "app_name": {
                                                 "type": "string",
                                                 "enum": ["calculator", "cmd", "windows_settings", "notepad"],
-                                                "description": "Name of the app to open."
+                                                "description": "Название приложения для открытия через open_app."
                                             }
                                         },
-                                        "description": "Parameters for the selected tool. Must be empty if tool is 'none'.",
+                                        "description": "Аргументы для выбранного инструмента. Должен быть пустым {}, если tool = 'none'.",
                                         "required": [],
                                         "additionalProperties": False
                                     },
-                                    "final_answer": {"type": "string", "description": "Your response to Andrey in direct speech."},
-                                    "mood": {"type": "string", "enum": ['neutral', 'happy', 'sad', 'angry', 'confused', 'shy', 'curious', 'determined', 'excited', 'surprised', 'playful'], "description": "Aurora’s emotional state, chosen only from the listed options. Select a mood that reflects your reaction to Andrey’s request or the context of the conversation. Avoid 'neutral' unless no other mood fits."},
+                                    "final_answer": {
+                                        "type": "string",
+                                        "description": (
+                                            "Твой ответ Андрею в прямой речи. "
+                                            "Если ответить нельзя без данных из памяти или инструмента — оставь пустым (''). "
+                                            "Не используй звёздочки, действия в скобках или эмодзи."
+                                        )
+                                    },
+                                    "mood": {
+                                        "type": "string",
+                                        "enum": ['neutral', 'happy', 'sad', 'angry', 'confused', 'shy', 'curious', 'determined', 'excited', 'surprised', 'playful'],
+                                        "description": (
+                                            "Эмоциональное состояние Авроры. Выбирай из списка. "
+                                            "Должно отражать твою реакцию на запрос. "
+                                            "Используй 'neutral' только если нет более подходящего варианта. "
+                                            "На втором вызове это поле обязательно."
+                                        )
+                                    },
                                     "add_user_preference": {
                                         "type": "object", 
-                                        "description": "Information about user that needs to be saved. Include this field ONLY if user shared concrete personal information (preferences, facts, habits, agreements). Do not include this field for greetings, questions, or regular conversation.",
+                                        "description": (
+                                            "Сохраняй СРАЗУ, если Андрей поделился конкретной информацией о себе. "
+                                            "Если нет — null. Не интерпретируй вопросы как предпочтения."
+                                        ),
                                         "properties": {
                                             "preference": {
                                                 "type": ["string"],
-                                                "description": "Text of user's concrete preference or fact about themselves."
+                                                "description": "Конкретное утверждение о пользователе, которое он сообщил. Например: 'Андрей любит RPG'."
                                             },
                                             "category": {
                                                 "type": ["string"],
                                                 "enum": ["interests", "personal_info", "communication_style", "daily_routine", "rules_and_boundaries"],
-                                                "description": "Category that preference belongs to."
+                                                "description": "Категория предпочтения."
                                             },
                                             "importance": {
                                                 "type": ["string"],
                                                 "enum": ["critical", "high", "medium", "low"],
-                                                "description": "Level of importance from, based on how much this should influence future conversations."
+                                                "description": "Уровень важности: critical — границы, high — ключевые привычки, medium — интересы, low — мимолётные упоминания."
                                             },
                                         },
                                         "required": [],
                                         "additionalProperties": False
+                                    },
+                                    "requires_memory": {
+                                        "type": "boolean",
+                                        "description": (
+                                            "true, если для ответа нужно искать в памяти (воспоминания, предпочтения, обещания и т.д.). "
+                                            "Если true — memory_query должен быть заполнен. "
+                                            "Если false — memory_query игнорируется."
+                                        )
+                                    },
+                                    "memory_query": {
+                                        "type": "string",
+                                        "description": (
+                                            "Семантический запрос для поиска воспоминаний в векторной базе. "
+                                            "Должен отражать суть, а не дословный текст. "
+                                            "Пример: вместо 'что я говорил о завтраке?' → 'утренние привычки Андрея'. "
+                                            "Должен быть заполнен всегда."
+                                        )
+                                    },
+                                    "requires_tool_result": {
+                                        "type": "boolean",
+                                        "description": (
+                                            "true, только если ты вызвала tool и если результат инструмента нужно интерпретировать (например результаты поиска прогноза погоды), а не просто выполнить действие (например открытие приложения). "
+                                            "Если true — после вызова инструмента будет второй вызов модели для обработки данных от инструмента."
+                                        )
+                                    },
+                                    "requires_follow_up": {
+                                        "type": "boolean",
+                                        "description": "True, если тебе не хватает данных для ответа и только, если requires_tool_result=true и requires_memory=true."
                                     }
                                 },
-                                "required": ["thoughts", "tool", "final_answer", "mood"],
+                                "required": [
+                                    "thoughts",
+                                    "tool",
+                                    "tool_arguments",
+                                    "final_answer",
+                                    "mood",
+                                    "add_user_preference",
+                                    "requires_memory",
+                                    "memory_query",
+                                    "requires_tool_result",
+                                    "requires_follow_up"
+                                ],
                                 "additionalProperties": False
                             }
                         }
