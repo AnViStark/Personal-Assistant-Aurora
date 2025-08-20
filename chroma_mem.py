@@ -23,7 +23,7 @@ class ChromaHandler():
             query_embeddings=embedding,
             n_results=1,
         )
-        duplicate_threshold = 0.1  # чем меньше, тем строже
+        duplicate_threshold = 0.3  # чем меньше, тем строже
         if result["documents"] and len(result["documents"][0]) > 0:
             candidate = result["documents"][0][0]
             score = result["distances"][0][0]

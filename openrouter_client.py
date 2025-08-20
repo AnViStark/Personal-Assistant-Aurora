@@ -17,12 +17,12 @@ class OpenRouterClient():
                     top_p=0.9,
                     frequency_penalty=0.4,
                     presence_penalty=0.6,
-                    # extra_body={
-                    #     "provider": {
-                    #         "order": ["Chutes"],
-                    #         "allow_fallbacks": False
-                    #     }
-                    # },
+                    extra_body={
+                        "provider": {
+                            "order": ["Chutes"],
+                            "allow_fallbacks": False
+                        }
+                    },
                     response_format = {
                         "type": "json_schema",
                         "json_schema": {
@@ -82,29 +82,40 @@ class OpenRouterClient():
                                         )
                                     },
                                     "add_user_preference": {
-                                        "type": "object", 
-                                        "description": (
-                                            "Сохраняй СРАЗУ, если Андрей поделился конкретной информацией о себе. "
-                                            "Если нет — null. Не интерпретируй вопросы как предпочтения."
-                                        ),
-                                        "properties": {
-                                            "preference": {
-                                                "type": ["string"],
-                                                "description": "Конкретное утверждение о пользователе, которое он сообщил. Например: 'Андрей любит RPG'."
+                                        "oneOf": [
+                                            {
+                                                "type": "object",
+                                                "properties": {
+                                                    "preference": {
+                                                        "type": "string",
+                                                        "minLength": 5
+                                                    },
+                                                    "category": {
+                                                        "type": "string",
+                                                        "enum": ["identity", 
+                                                                "habits", 
+                                                                "interests", 
+                                                                "skills", 
+                                                                "goals", 
+                                                                "relationships", 
+                                                                "boundaries", 
+                                                                "preferences", 
+                                                                "promises", 
+                                                                "events"]
+                                                    },
+                                                    "importance": {
+                                                        "type": "string",
+                                                        "enum": ["critical", "high", "medium", "low"]
+                                                    }
+                                                },
+                                                "required": ["preference", "category", "importance"],
+                                                "additionalProperties": False
                                             },
-                                            "category": {
-                                                "type": ["string"],
-                                                "enum": ["interests", "personal_info", "communication_style", "daily_routine", "rules_and_boundaries"],
-                                                "description": "Категория предпочтения."
-                                            },
-                                            "importance": {
-                                                "type": ["string"],
-                                                "enum": ["critical", "high", "medium", "low"],
-                                                "description": "Уровень важности: critical — границы, high — ключевые привычки, medium — интересы, low — мимолётные упоминания."
-                                            },
-                                        },
-                                        "required": [],
-                                        "additionalProperties": False
+                                            {
+                                                "type": "null"
+                                            }
+                                        ],
+                                        "description": "Либо полный объект с утверждением, либо null. Никаких пустых или частичных объектов."
                                     },
                                     "requires_memory": {
                                         "type": "boolean",
