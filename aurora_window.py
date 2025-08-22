@@ -9,7 +9,7 @@ from datetime import datetime
 import json
 
 
-from prompts import (
+from main_prompts import (
     PERSONALITY_PROMPT,
     PLANNING_PHASE_PROMPT,
     MEMORY_PROMPT,
@@ -41,12 +41,13 @@ APP_MAPPING = {
 }
 
 class MainWindow(QMainWindow):
-    def __init__(self, client, mongodb, chroma_memory):
+    def __init__(self, client, mongodb, chroma_memory, memory_agent):
         super().__init__()
         
         self.client = client
         self.mongodb = mongodb
         self.chroma_memory = chroma_memory
+        self.memory_agent = memory_agent
 
         self.setWindowTitle("Аврора")
         self.resize(850, 700)
@@ -115,6 +116,14 @@ class MainWindow(QMainWindow):
         # === Загрузка истории ===
         dialogue_history = self.mongodb.get_n_records(self.mongodb.phrases, 30)
         print(f"\n📌 История загружена: {len(dialogue_history)} сообщений")
+
+        # === ФАЗА ПАМЯТИ 1: ПЛАНИРОВАНИЕ ===
+        memory_agent_planning_answer = self.memory_agent.activate_memory_agent(self.user_request, dialogue_history, 1)
+
+        # === ФАЗА ПАМЯТИ 1: ПЛАНИРОВАНИЕ ===
+        if memory_agent_planning_answer.get("requires_memory") or memory_agent_planning_answer.get("is_new_info"):
+            memory_agent_final_answer = self.memory_agent.activate_memory_agent(self.user_request, dialogue_history, 2, memory_agent_planning_answer)
+            
 
         # === ФАЗА 1: ПЛАНИРОВАНИЕ ===
         planning_system_prompt = self.build_planning_system_prompt(self.user_request)

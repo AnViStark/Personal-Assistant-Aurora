@@ -18,24 +18,25 @@ class ChromaHandler():
         creation_date = datetime.now().strftime("%d.%m.%y")
         embedding = self.model.encode(text, convert_to_numpy=True).tolist()
 
-        # проверка на дубликат
+        # Поиск дубликатов
         result = self.collection.query(
-            query_embeddings=embedding,
+            query_embeddings=[embedding],
             n_results=1,
+            include=["documents", "distances"]
         )
-        duplicate_threshold = 0.3  # чем меньше, тем строже
+
+        duplicate_threshold = 0.3
         if result["documents"] and len(result["documents"][0]) > 0:
-            candidate = result["documents"][0][0]
             score = result["distances"][0][0]
             if score < duplicate_threshold:
-                print("Дубликат найден, не добавляю:", candidate)
+                print("Дубликат найден, не добавляю:", result["documents"][0][0])
                 return
-            print(f"Запись добавлена в chroma: {text}")
 
+        print(f"Запись добавлена в chroma: {text}")
         self.collection.add(
-            documents=text,
-            embeddings=embedding,
-            ids=str(uuid.uuid4()),
+            documents=[text],
+            embeddings=[embedding],
+            ids=[str(uuid.uuid4())],
             metadatas=[{
                 "category": category,
                 "importance": importance,
@@ -43,33 +44,45 @@ class ChromaHandler():
             }]
         )
     
-    def search_memory(self, query, k=5, threshold=0.7):
+    def search_memory(self, query, k=10, threshold=0.7):
         global last_successful_search_results
         query_vec = self.model.encode(query, convert_to_numpy=True).tolist()
         results = self.collection.query(
-            query_embeddings=query_vec,
+            query_embeddings=[query_vec],  # ← должен быть списком векторов
             n_results=k,
-            include=["documents", "distances"],
+            include=["documents", "metadatas", "distances"],  # ← важно: metadatas
             where={"importance": {"$in": ["high", "medium", "low"]}}
         )
 
+        # Проверяем, есть ли результатыы
+        if not results["documents"] or len(results["documents"][0]) == 0:
+            print("Нет результатов поиска.")
+            return last_successful_search_results
+
+        documents = results["documents"][0]
+        metadatas = results["metadatas"][0]
+        distances = results["distances"][0]
+        ids = results["ids"][0]
+
         filtered = []
-        for doc, dist in zip(results["documents"][0], results["distances"][0]):
-            if dist < threshold:
-                filtered.append(doc)
+        for doc, dist, meta, id in zip(documents, distances, metadatas, ids):
+            if dist < threshold:  # чем меньше расстояние, тем ближе
+                filtered.append({
+                    "id": id,
+                    "text": doc,
+                    "category": meta["category"],
+                    "importance": meta["importance"]
+                })
 
         print(f"Запрос: {query}")
-        print(results)
+        print(f"Результаты: {results}")
 
         if filtered:
             print(f"ПРОШЛИ ФИЛЬТР: {filtered}")
-        else:
-            print(f"НИКТО НЕ ПРОШЕЛ ФИЛЬТР. ИСПОЛЬЗУЮТСЯ ПОСЛЕДНИЕ ПРОШЕДШИЕ: {last_successful_search_results}")
-
-        if filtered:
             last_successful_search_results = filtered
             return filtered
         else:
+            print("НИКТО НЕ ПРОШЕЛ ФИЛЬТР. ИСПОЛЬЗУЮТСЯ ПОСЛЕДНИЕ ПРОШЕДШИЕ.")
             return last_successful_search_results
 
 

@@ -12,6 +12,7 @@ from openrouter_client import OpenRouterClient
 from database_handler import DatabaseHandler
 from chroma_mem import ChromaHandler
 from aurora_window import MainWindow
+from memory_agent import MemoryAgent
 
 
 def main():
@@ -26,6 +27,7 @@ def main():
     client = OpenRouterClient(OPENROUTER_API_KEY)
     mongodb = DatabaseHandler()
     chroma_memory = ChromaHandler()
+    memory_agent = MemoryAgent()
 
     window = MainWindow(client, mongodb, chroma_memory)
     window.show()
