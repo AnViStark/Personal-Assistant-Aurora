@@ -53,21 +53,56 @@ class MemoryAgent():
 
             return "\n\n".join(prompt_parts)
     
-    def activate_memory_agent(self, user_request, dialogue_context, memory_step, first_step_response):
+    def activate_memory_agent(self, user_request, dialogue_context, memory_step, first_step_response=None):
         if memory_step == 1:
-            system_prompt = self.build_system_prompt(memory_step, user_request, dialogue_context)
-            messages = [
-                {"role": "system", "content": system_prompt}
-            ]
-            answer = self.client.chat_completion(self.model_name, messages, MEMORY_AGENT_PLANNING_SCHEMA)
-            return answer
-        if memory_step == 2:
-            system_prompt = self.build_system_prompt(memory_step, user_request, dialogue_context, first_step_response)
-            messages = [
-                {"role": "system", "content": system_prompt}
-            ]
-            answer = self.client.chat_completion(self.model_name, messages, MEMORY_AGENT_FINAL_SCHEMA)
-            return answer
+            system_prompt = self.build_system_prompt(1, user_request, dialogue_context)
+            messages = [{"role": "system", "content": system_prompt}]
+            return self.client.chat_completion(self.model_name, messages, MEMORY_AGENT_PLANNING_SCHEMA)
+
+        elif memory_step == 2:
+            system_prompt = self.build_system_prompt(2, user_request, dialogue_context, first_step_response)
+            messages = [{"role": "system", "content": system_prompt}]
+            second_response = self.client.chat_completion(self.model_name, messages, MEMORY_AGENT_FINAL_SCHEMA)
+            
+            # Возвращаем НЕ ответ агента, а результат действий — relevant_memories
+            return self.apply_memory_action(second_response)
+        
+    def apply_memory_action(self, action_response: dict):
+        new_action = action_response.get("new_memory_action", {})
+        if not new_action:
+            print("[MemoryAgent] Нет данных для действия с памятью")
+            return relevant_memories
+        relevant_memories = action_response.get("relevant_memories", [])
+
+        action = new_action.get("action")
+        old_id = new_action.get("old_memory_id")
+        new_memory = new_action.get("new_memory")
+
+        # 1. Обработка обновления или создания
+        if action == "update" and new_memory:
+            if old_id:
+                self.chroma.delete_record(old_id)
+                print(f"[MemoryAgent] Удалена старая запись: {old_id}")
+            self.chroma.add_record(
+                text=new_memory["text"],
+                category=new_memory["category"],
+                importance=new_memory["importance"]
+            )
+            print(f"[MemoryAgent] Добавлена новая запись: {new_memory['text']}")
+
+        elif action == "create" and new_memory:
+            self.chroma.add_record(
+                text=new_memory["text"],
+                category=new_memory["category"],
+                importance=new_memory["importance"]
+            )
+            print(f"[MemoryAgent] Добавлена новая запись: {new_memory['text']}")
+
+        elif action == "skip":
+            print("[MemoryAgent] Новая запись пропущена (дубль или неактуальна)")
+
+        # 2. Возвращаем релевантные воспоминания для контекста
+        return relevant_memories
 
 
 

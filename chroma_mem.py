@@ -92,3 +92,10 @@ class ChromaHandler():
         )
         print(f'Критические предпочтения: {results.get("documents", [])}')
         return results.get("documents", [])
+    
+    def delete_record(self, record_id: str):
+        try:
+            self.collection.delete(ids=[record_id])
+            print(f"[Chroma] Удалена запись: {record_id}")
+        except Exception as e:
+            print(f"[Chroma] Ошибка при удалении записи {record_id}: {e}")
