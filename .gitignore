@@ -1,0 +1,29 @@
+# байткод Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# виртуальные окружения
+.venv/
+venv/
+env/
+
+# логи
+*.log
+
+# настройки IDE/редакторов
+.vscode/
+.idea/
+*.swp
+
+# результаты сборки
+build/
+dist/
+*.egg-info/
+
+# Jupyter
+.ipynb_checkpoints
+
+# системные файлы
+.DS_Store
+Thumbs.db

@@ -4,7 +4,7 @@ from openrouter_schemas import MEMORY_AGENT_FINAL_SCHEMA, MEMORY_AGENT_PLANNING_
 from memory_agent_prompts import MEMORY_AGENT_PLANNING_PROMPT, MEMORY_AGENT_FINAL_PROMPT
 
 class MemoryAgent():
-    def __init__(self, client: OpenRouterClient, chroma: ChromaHandler, model_name: str = "deepseek/deepseek-chat-v3-0324:free"):
+    def __init__(self, client: OpenRouterClient, chroma: ChromaHandler, model_name: str = "openai/gpt-oss-20b:free"):
         self.client = client
         self.chroma = chroma
         self.model_name = model_name
@@ -13,7 +13,6 @@ class MemoryAgent():
         prompt_parts = []
         
         if memory_step == MEMORY_AGENT_PLANNING_PROMPT:
-            # Собираем контекст
             history_parts = []
             start_idx = max(0, len(dialogue_context) - 11)
             for msg in dialogue_context[start_idx:-1]:  # все кроме последнего (это user_request)
@@ -43,42 +42,82 @@ class MemoryAgent():
                     f"new_memory_record: {new_memory_record}, category: {category}, importance: {importance}."
                 )
                 prompt_parts.append(
-                    f"В памяти найдены следующие записи, похожие семантически по смыслу на новое воспоминание: {relevant_memories}"
+                    f"В памяти найдены следующие записи, похожие семантически: {relevant_memories}"
                 )
 
             elif first_step_response.get("requires_memory"):
                 prompt_parts.append(
-                    f"В памяти найдены следующие записи, похожие семантически по смыслу на новую реплику пользователя: {relevant_memories}"
+                    f"В памяти найдены следующие записи, релевантные новой реплике: {relevant_memories}"
                 )
 
             return "\n\n".join(prompt_parts)
     
-    def activate_memory_agent(self, user_request, dialogue_context, memory_step, first_step_response=None):
-        if memory_step == 1:
-            system_prompt = self.build_system_prompt(1, user_request, dialogue_context)
-            messages = [{"role": "system", "content": system_prompt}]
-            return self.client.chat_completion(self.model_name, messages, MEMORY_AGENT_PLANNING_SCHEMA)
-
-        elif memory_step == 2:
-            system_prompt = self.build_system_prompt(2, user_request, dialogue_context, first_step_response)
-            messages = [{"role": "system", "content": system_prompt}]
-            second_response = self.client.chat_completion(self.model_name, messages, MEMORY_AGENT_FINAL_SCHEMA)
-            
-            # Возвращаем НЕ ответ агента, а результат действий — relevant_memories
-            return self.apply_memory_action(second_response)
+    def activate_memory_agent_phase1(self, user_request, dialogue_context):
+        system_prompt = self.build_system_prompt(MEMORY_AGENT_PLANNING_PROMPT, user_request, dialogue_context)
+        messages = [{"role": "system", "content": system_prompt}]
         
+        print("\n[MemoryAgent:Phase1] Отправляем промпт:")
+        print(dialogue_context)
+        
+        response = self.client.chat_completion(
+            self.model_name,
+            messages,
+            schema=MEMORY_AGENT_PLANNING_SCHEMA
+        )
+        
+        print("\n[MemoryAgent:Phase1] Полный ответ API:")
+        print(response)
+        return response
+
+    def activate_memory_agent_phase2(self, user_request, dialogue_context, first_step_response):
+        system_prompt = self.build_system_prompt(
+            MEMORY_AGENT_FINAL_PROMPT,
+            user_request,
+            dialogue_context,
+            first_step_response
+        )
+        messages = [{"role": "system", "content": system_prompt}]
+        
+        print("\n[MemoryAgent:Phase2] Отправляем промпт:")
+        print(dialogue_context)
+
+        second_response = self.client.chat_completion(
+            self.model_name,
+            messages,
+            schema=MEMORY_AGENT_FINAL_SCHEMA
+        )
+        
+        print("\n[MemoryAgent:Phase2] Полный ответ API:")
+        print(second_response)
+
+        # --- Сохраняем новую информацию в память ---
+        if first_step_response.get("is_new_info"):
+            self.apply_memory_action(second_response)
+            print("[MemoryAgent] Новая информация сохранена в память.")
+
+        # --- Отдаём релевантные старые записи для Авроры ---
+        relevant_memories = []
+        if first_step_response.get("requires_memory"):
+            relevant_memories = second_response.get("relevant_memories", [])
+            print(f"[MemoryAgent] Передаем Авроре релевантные старые записи: {relevant_memories}")
+
+        return relevant_memories
+            
     def apply_memory_action(self, action_response: dict):
+        print("\n[MemoryAgent] Разбираем действие с памятью...")
         new_action = action_response.get("new_memory_action", {})
+        relevant_memories = action_response.get("relevant_memories", [])
+        
         if not new_action:
             print("[MemoryAgent] Нет данных для действия с памятью")
             return relevant_memories
-        relevant_memories = action_response.get("relevant_memories", [])
 
         action = new_action.get("action")
         old_id = new_action.get("old_memory_id")
         new_memory = new_action.get("new_memory")
 
-        # 1. Обработка обновления или создания
+        print(f"[MemoryAgent] Действие: {action}, old_id={old_id}, new_memory={new_memory}")
+
         if action == "update" and new_memory:
             if old_id:
                 self.chroma.delete_record(old_id)
@@ -101,10 +140,4 @@ class MemoryAgent():
         elif action == "skip":
             print("[MemoryAgent] Новая запись пропущена (дубль или неактуальна)")
 
-        # 2. Возвращаем релевантные воспоминания для контекста
         return relevant_memories
-
-
-
-
-        

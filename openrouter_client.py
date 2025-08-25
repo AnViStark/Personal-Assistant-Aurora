@@ -14,16 +14,16 @@ class OpenRouterClient():
             completion = self.client.chat.completions.create(
                     model=model,
                     messages=messages,
-                    temperature=0.55,
+                    temperature=0.8,
                     top_p=0.9,
                     frequency_penalty=0.4,
                     presence_penalty=0.6,
-                    extra_body={
-                        "provider": {
-                            "order": ["Chutes"],
-                            "allow_fallbacks": False
-                        }
-                    },
+                    # extra_body={
+                    #     "provider": {
+                    #         "order": ["Chutes", "atlas-cloud/fp8", "venice/fp16", "venice/fp8"],
+                    #         "allow_fallbacks": False
+                    #     }
+                    # },
                     response_format = schema
             )
             result = json.loads(completion.choices[0].message.content)

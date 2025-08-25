@@ -13,6 +13,7 @@ from database_handler import DatabaseHandler
 from chroma_mem import ChromaHandler
 from aurora_window import MainWindow
 from memory_agent import MemoryAgent
+from chat_tts.chatts import AudioManager
 
 
 def main():
@@ -27,9 +28,10 @@ def main():
     client = OpenRouterClient(OPENROUTER_API_KEY)
     mongodb = DatabaseHandler()
     chroma_memory = ChromaHandler()
-    memory_agent = MemoryAgent()
+    memory_agent = MemoryAgent(client, chroma_memory)
+    audio_manager = AudioManager()
 
-    window = MainWindow(client, mongodb, chroma_memory)
+    window = MainWindow(client, mongodb, chroma_memory, memory_agent, audio_manager)
     window.show()
 
     sys.exit(app.exec())

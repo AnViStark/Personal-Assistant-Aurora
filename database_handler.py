@@ -23,9 +23,12 @@ class DatabaseHandler():
 
     def get_n_records(self, collection, number):
         try:
-            return list(collection.find().sort("_id", -1).limit(number))
+            # Возвращаем в правильном порядке: старое → новое
+            records = list(collection.find().sort("_id", -1).limit(number))
+            return list(reversed(records))
         except Exception as e:
             print(str(e))
+            return []
     
     def delete_all_records(self, collection):
         try:

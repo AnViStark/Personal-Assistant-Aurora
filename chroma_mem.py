@@ -11,7 +11,7 @@ class ChromaHandler():
         self.chroma_client = chromadb.PersistentClient(path="./chroma_db")
         self.collection = self.chroma_client.get_or_create_collection(
             name="preferences",
-            metadata={"hnsw:space": "cosine"}  # используем косинусную меру
+            metadata={"hnsw:space": "cosine"}
         )
 
     def add_record(self, text, category, importance):
@@ -66,7 +66,7 @@ class ChromaHandler():
 
         filtered = []
         for doc, dist, meta, id in zip(documents, distances, metadatas, ids):
-            if dist < threshold:  # чем меньше расстояние, тем ближе
+            if dist < threshold:
                 filtered.append({
                     "id": id,
                     "text": doc,
